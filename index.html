@@ -1,0 +1,979 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:,">
+<title>EA 8: Lichter auf einer Kreisbahn mit Toon Shading</title>
+
+<style>
+  :root {
+    --bg: #ffffff;
+    --surface: #ffffff;
+    --soft: #f5f5f5;
+    --primary: #1a1a1a;
+    --primary-dark: #000000;
+    --primary-light: #ededed;
+    --accent: #2a2a2a;
+    --success: #2e7d32;
+    --success-bg: #e8f5e9;
+    --error: #c62828;
+    --error-bg: #ffebee;
+    --warn: #ef6c00;
+    --warn-bg: #fff3e0;
+    --text: #1a1a1a;
+    --text-muted: #6b6b6b;
+    --border: #d4d4d4;
+    --border-strong: #1a1a1a;
+    --shadow: 0 1px 2px rgba(0,0,0,.05);
+    --shadow-lg: 0 2px 6px rgba(0,0,0,.06);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.55;
+  }
+
+  header {
+    background: #1a1a1a;
+    color: #fff;
+    padding: 2.5rem 1.5rem 2rem;
+    border-bottom: 1px solid #000;
+  }
+  header .wrap { max-width: 1080px; margin: 0 auto; }
+  header h1 { margin: 0 0 .35rem; font-size: 1.85rem; font-weight: 600; }
+  header p { margin: 0; opacity: .92; font-size: 1rem; }
+  header .meta {
+    margin-top: 1rem; font-size: .85rem; opacity: .75;
+    display: flex; flex-wrap: wrap; gap: .25rem 1rem;
+  }
+
+  main { max-width: 1080px; margin: 0 auto; padding: 2rem 1.5rem 4rem; }
+
+  section { margin-bottom: 3rem; }
+
+  h2 {
+    font-size: 1.35rem; margin: 0 0 1rem;
+    padding-bottom: .5rem; border-bottom: 1px solid var(--border);
+  }
+  h2 .num {
+    display: inline-block; background: #1a1a1a; color: #fff;
+    border-radius: 2px; padding: .15rem .55rem; margin-right: .55rem;
+    font-size: .85rem; vertical-align: middle; letter-spacing: .03em;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid #1a1a1a;
+    border-radius: 4px;
+    box-shadow: var(--shadow);
+    padding: 1rem 1.1rem 1.1rem;
+    margin-bottom: 1.25rem;
+  }
+  .card h4 { margin: 0 0 .35rem; font-size: .95rem; font-weight: 600; }
+  .card .sub { font-size: .82rem; color: var(--text-muted); margin: 0 0 .65rem; }
+
+  .toolbar { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+  .btn {
+    display: inline-block; padding: .5rem 1rem;
+    background: #1a1a1a; color: #fff;
+    border: 1px solid #1a1a1a; border-radius: 2px;
+    font-size: .9rem; font-weight: 500; cursor: pointer;
+    transition: background .15s, color .15s;
+    font-family: inherit;
+  }
+  .btn:hover, .btn.is-pressed { background: #fff; color: #1a1a1a; }
+  .btn:focus-visible { outline: 2px solid #1a1a1a; outline-offset: 2px; }
+  .btn:disabled { background: #fff; color: var(--text-muted); border-color: var(--border); cursor: not-allowed; }
+  .btn.secondary { background: #fff; color: #1a1a1a; }
+  .btn.secondary:hover, .btn.secondary.is-pressed { background: #1a1a1a; color: #fff; }
+  .btn kbd { margin-left: .35rem; }
+
+  .global-status {
+    background: var(--soft); color: var(--text);
+    border-left: 3px solid #1a1a1a;
+    padding: .65rem 1rem; border-radius: 0;
+    font-size: .9rem; margin-bottom: 1.25rem;
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  .global-status.is-ready { background: var(--success-bg); border-left-color: var(--success); }
+  .global-status.is-error { background: var(--error-bg); border-left-color: var(--error); color: var(--error); white-space: pre-wrap; }
+  .global-status.is-warn  { background: var(--warn-bg);  border-left-color: var(--warn); }
+
+  .statline {
+    display: flex; flex-wrap: wrap; gap: .4rem 1.5rem; margin: 0 0 1rem;
+    font-size: .9rem; font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+  .statline b { font-weight: 600; }
+
+  /* Bühne für das WebGL-Bild: feste Auflösung, per CSS auf Containerbreite skaliert */
+  .stage {
+    background: var(--soft); border: 1px solid var(--border); border-radius: 4px;
+    padding: .5rem; margin-bottom: 1rem;
+  }
+  .stage canvas {
+    display: block; width: 100%; height: auto; aspect-ratio: 16 / 10;
+    border-radius: 2px; background: #1e2126;
+  }
+  .toolbar .group-label {
+    align-self: center; font-size: .82rem; color: var(--text-muted); margin-right: .15rem;
+  }
+  .toolbar.cam .btn { padding: .5rem .8rem; }
+
+  .formula {
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .9rem;
+    background: var(--soft); border-left: 3px solid #1a1a1a;
+    padding: .55rem .8rem; margin: 0 0 .9rem; overflow-x: auto;
+  }
+
+  .prose { max-width: 740px; }
+  .prose p { margin: 0 0 .75rem; }
+  .prose ul { padding-left: 1.4rem; margin: 0 0 1rem; }
+  .prose li { margin-bottom: .35rem; }
+  .prose a { color: #1a1a1a; text-decoration-thickness: 1px; overflow-wrap: anywhere; }
+  .prose a:hover { text-decoration-thickness: 2px; }
+  .prose code { background: var(--soft); padding: 0 .3rem; border-radius: 3px; font-size: .9em; overflow-wrap: anywhere; }
+
+  table.key-table { border-collapse: collapse; margin: .5rem 0 1rem; font-size: .9rem; width: 100%; }
+  table.key-table th, table.key-table td { border: 1px solid var(--border); padding: .4rem .7rem; text-align: left; }
+  table.key-table th { background: var(--soft); font-weight: 600; }
+  table.key-table td:first-child { white-space: nowrap; width: 1%; }
+
+  kbd {
+    display: inline-block; padding: .05rem .35rem; background: var(--soft);
+    border: 1px solid var(--border); border-radius: 3px; font-size: .78rem; color: var(--text);
+    font-family: ui-monospace, Menlo, Consolas, monospace;
+  }
+
+  footer { border-top: 1px solid var(--border); padding-top: 1.5rem; font-size: .85rem; color: var(--text-muted); }
+
+  @media (max-width: 720px) {
+    header h1 { font-size: 1.5rem; }
+    main { padding: 1.5rem 1rem 3rem; }
+    .stage { padding: .25rem; }
+  }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+
+  /* Kontextsensitive Hilfe (ISO 9241-110) */
+  .help { position: relative; display: inline-block; margin-left: .5rem; vertical-align: middle; }
+  .help-btn {
+    width: 1.4rem; height: 1.4rem; padding: 0;
+    border: 1px solid var(--border-strong); background: #fff; color: var(--text);
+    border-radius: 50%; font-size: .8rem; font-weight: 600; cursor: help; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .help-btn:hover, .help-btn:focus-visible { background: var(--text); color: #fff; outline: none; }
+  .help-popover {
+    display: none; position: absolute; top: calc(100% + .35rem); left: 50%; transform: translateX(-50%);
+    width: min(360px, 80vw); background: #fff; color: var(--text);
+    border: 1px solid var(--border-strong); border-radius: 4px;
+    padding: .7rem .85rem; font-size: .85rem; line-height: 1.45;
+    box-shadow: var(--shadow-lg); z-index: 10; text-align: left; font-weight: normal;
+  }
+  .help-popover::before {
+    content: ""; position: absolute; top: -7px; left: 50%; transform: translateX(-50%) rotate(45deg);
+    width: 12px; height: 12px; background: #fff;
+    border-left: 1px solid var(--border-strong); border-top: 1px solid var(--border-strong);
+  }
+  .help.is-open .help-popover { display: block; }
+  .help-popover h4 { margin: 0 0 .35rem; font-size: .9rem; font-weight: 600; }
+  .help-popover p { margin: 0 0 .35rem; }
+  .help-popover p:last-child { margin-bottom: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>EA 8: Lichter auf einer Kreisbahn mit Toon Shading</h1>
+    <p>Die Szene aus Übung BEL-03 mit zwei weißen Punktlichtern und farbigen Materialien, berechnet mit Phong-Beleuchtung pro Fragment. Mit der Taste L wandern beide Lichter schrittweise auf einer Kreisbahn um die Modelle, mit T wird ein Toon-Shader zugeschaltet.</p>
+    <div class="meta">
+      <span>Hamid Mergan</span>
+      <span>TH Lübeck</span>
+      <span>Modul Graphical Visualisation Technologies</span>
+      <span>Wintersemester 2026/27</span>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <div id="globalStatus" class="global-status" role="status" aria-live="polite">Initialisiere WebGL …</div>
+
+  <!-- A1 Szene -->
+  <section aria-labelledby="a1">
+    <h2 id="a1"><span class="num">A1</span>Zwei Lichter auf einer Kreisbahn
+      <span class="help">
+        <button type="button" class="help-btn" aria-label="Hilfe zu A1" aria-expanded="false">?</button>
+        <span class="help-popover" role="tooltip">
+          <h4>So bewegst du die Lichter</h4>
+          <p>Jeder Druck auf <kbd>l</kbd> oder <kbd>L</kbd> bewegt beide Lichter um 15° weiter auf ihrer Kreisbahn, von oben gesehen gegen den Uhrzeigersinn. Gedrückthalten zählt nur als ein Schritt.</p>
+          <p>Die gelben Kugeln markieren die Lichtpositionen. Mit den Pfeiltasten fährt die Kamera um die Szene, die Lichter bleiben dabei an ihrem Platz in der Welt.</p>
+        </span>
+      </span>
+    </h2>
+
+    <div class="card">
+      <h4>Szene</h4>
+      <p class="sub">Roter Torus, grüne und blaue Kugel auf einer hellgrauen Ebene. Zwei weiße Punktlichter in 1 Einheit Höhe auf einem Kreis mit Radius √18 ≈ 4,24 um die Y-Achse.</p>
+      <div class="stage">
+        <canvas id="glCanvas" width="1040" height="650" role="img" aria-label="3D-Szene mit rotem Torus, grüner und blauer Kugel auf einer hellen Ebene, beleuchtet von zwei Lichtern, die als gelbe Kugeln zu sehen sind"></canvas>
+      </div>
+      <div class="statline" aria-label="Zustand der Szene">
+        <span><b>Bahnwinkel:</b> <span id="infoAngle">0°</span></span>
+        <span><b>Licht 1:</b> <span id="infoL1">…</span></span>
+        <span><b>Licht 2:</b> <span id="infoL2">…</span></span>
+        <span><b>Toon-Shader:</b> <span id="infoToon">aus</span></span>
+        <span><b>Kamera:</b> <span id="infoCam">…</span></span>
+      </div>
+      <div class="toolbar">
+        <button id="btnLights" class="btn" type="button" disabled>Lichter weiterbewegen ↺<kbd>L</kbd></button>
+        <button id="btnToon" class="btn secondary" type="button" aria-pressed="false" disabled><span id="btnToonLabel">Toon-Shader einschalten</span><kbd>T</kbd></button>
+      </div>
+      <div class="toolbar cam" aria-label="Kamera">
+        <span class="group-label">Kamera:</span>
+        <button id="btnCamLeft" class="btn secondary" type="button" aria-label="Kamera nach links um die Szene drehen" disabled>◀<kbd>←</kbd></button>
+        <button id="btnCamRight" class="btn secondary" type="button" aria-label="Kamera nach rechts um die Szene drehen" disabled>▶<kbd>→</kbd></button>
+        <button id="btnCamUp" class="btn secondary" type="button" aria-label="Kamera anheben" disabled>▲<kbd>↑</kbd></button>
+        <button id="btnCamDown" class="btn secondary" type="button" aria-label="Kamera absenken" disabled>▼<kbd>↓</kbd></button>
+      </div>
+    </div>
+  </section>
+
+  <!-- A2 Erweiterung -->
+  <section aria-labelledby="a2">
+    <h2 id="a2"><span class="num">A2</span>Erweiterung: Toon-Shader (bearbeitet)
+      <span class="help">
+        <button type="button" class="help-btn" aria-label="Hilfe zu A2" aria-expanded="false">?</button>
+        <span class="help-popover" role="tooltip">
+          <h4>Toon-Shader schalten</h4>
+          <p><kbd>t</kbd> oder <kbd>T</kbd> schaltet zwischen normalem Phong-Shading und Toon-Shading um. Der Button oben macht dasselbe und zeigt den aktuellen Zustand.</p>
+        </span>
+      </span>
+    </h2>
+    <div class="card">
+      <h4>Cel-Shading im Fragment-Shader</h4>
+      <p class="sub">Die Erweiterung ist bearbeitet. Sie läuft im selben Shader-Programm und wird über die Uniform-Variable <code>uToon</code> geschaltet.</p>
+      <div class="prose">
+        <p>Statt glatter Farbverläufe zeigt der Toon-Shader wenige, hart abgegrenzte Farbflächen wie in einem Zeichentrickfilm. Die Farben der Materialien bleiben erhalten, nur die Helligkeit wird in Stufen eingeteilt:</p>
+        <ul>
+          <li><b>Diffuse Stufen:</b> Für jedes Licht wird <code>dot(n, s)</code> auf vier Stufen gerundet (0, 0,4, 0,7 und 1,0 bei den Schwellen 0,2, 0,5 und 0,85). Die Stufen werden mit der Materialfarbe <code>kd</code> und der Lichtfarbe multipliziert.</li>
+          <li><b>Harter Glanzpunkt:</b> Der spekulare Term <code>dot(r, v)<sup>ke</sup></code> wird mit der Schwelle 0,5 auf 0 oder 1 gesetzt. So entsteht ein scharf begrenzter weißer Fleck.</li>
+          <li><b>Silhouette:</b> Ist der Winkel zwischen Normale und Blickrichtung groß (<code>dot(n, v)</code> kleiner als 0,3), wird das Fragment fast schwarz, leicht in der Materialfarbe getönt. Torus und Kugeln erhalten so eine dunkle Kontur. Die Bodenebene ist davon ausgenommen, weil sie sonst am hinteren Rand komplett dunkel würde.</li>
+          <li><b>Ambienter Anteil:</b> bleibt unverändert <code>ka La</code>, damit die Schattenseiten farbig bleiben.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- A3 Bedienung -->
+  <section aria-labelledby="a3">
+    <h2 id="a3"><span class="num">A3</span>Bedienung
+      <span class="help">
+        <button type="button" class="help-btn" aria-label="Hilfe zu A3" aria-expanded="false">?</button>
+        <span class="help-popover" role="tooltip">
+          <h4>Tastatur oder Maus</h4>
+          <p>Jede Taste hat einen Button. Beim Tastendruck leuchtet der zugehörige Button kurz auf.</p>
+        </span>
+      </span>
+    </h2>
+    <table class="key-table">
+      <thead><tr><th>Taste</th><th>Wirkung</th></tr></thead>
+      <tbody>
+        <tr><td><kbd>l</kbd> / <kbd>L</kbd></td><td>Beide Lichter einen Schritt (15°) weiter auf der Kreisbahn bewegen, von oben gesehen gegen den Uhrzeigersinn. Shift hat keinen Einfluss.</td></tr>
+        <tr><td><kbd>t</kbd> / <kbd>T</kbd></td><td>Toon-Shader ein- und ausschalten (Erweiterung)</td></tr>
+        <tr><td><kbd>←</kbd> / <kbd>→</kbd></td><td>Kamera um die Szene drehen (5° pro Schritt)</td></tr>
+        <tr><td><kbd>↑</kbd> / <kbd>↓</kbd></td><td>Kamera anheben bzw. absenken</td></tr>
+      </tbody>
+    </table>
+    <div class="prose">
+      <p>Für jeden weiteren Lichtschritt muss <code>L</code> erneut gedrückt werden. Gedrückthalten löst keinen Dauerlauf aus, ebenso bei <code>T</code>. Die Pfeiltasten dürfen gedrückt gehalten werden und scrollen die Seite nicht. Tastenkombinationen mit Strg, Cmd oder Alt werden nicht abgefangen.</p>
+    </div>
+  </section>
+
+  <!-- A4 Dokumentation -->
+  <section aria-labelledby="a4">
+    <h2 id="a4"><span class="num">A4</span>Umsetzung</h2>
+    <div class="prose">
+      <p><b>Szene nach Übung BEL-03.</b> Torus (R = 0,5, r = 0,25) bei <code>(0, 0.75, 0)</code>, zwei Kugeln mit Radius 0,5 bei <code>(±1.25, 0.5, 0)</code> und eine Ebene (12 × 12) bei y = 0. Materialien wie in der Übung: Torus rot, linke Kugel grün, rechte Kugel blau mit <code>ks = 0,8</code> und <code>ke = 10</code>, Ebene hellgrau mit <code>ka = 1</code>, <code>kd = 0,5</code> und ohne spekularen Anteil. Abweichend von der Musterlösung ist <code>ka</code> bei Torus und Kugeln in der Materialfarbe getönt (0,4 im Farbkanal statt 0,3 grau), damit die Schattenseiten farbig bleiben. Ambientes Licht <code>La = 0,5</code>.</p>
+      <p><b>Beleuchtung.</b> Phong-Beleuchtungsmodell mit Phong-Shading, also pro Fragment im Fragment-Shader. Vertex-Position und Normale werden im Vertex-Shader in Kamera-Koordinaten transformiert und als Varying-Variablen <code>vPosition</code> und <code>vNormal</code> interpoliert. Die interpolierte Normale wird im Fragment-Shader neu normiert.</p>
+      <div class="formula">Lr = ka La + kd Σ<sub>j</sub> Lj ⟨n, s<sub>j</sub>⟩ + ks Σ<sub>j</sub> Lj ⟨r<sub>j</sub>, v⟩<sup>ke</sup></div>
+      <p>Dabei steht ⟨a, b⟩ für das Skalarprodukt, die Farbvektoren werden komponentenweise multipliziert. Negative Skalarprodukte werden auf 0 gesetzt.</p>
+      <p><b>Normalenmatrix.</b> Für jedes Modell wird aus der Model-View-Matrix die Normalenmatrix als Inverse der Transponierten ihres oberen 3×3-Teils berechnet und als <code>uNMatrix</code> übergeben.</p>
+      <p><b>Lichter auf der Kreisbahn.</b> Die Lichter sind Welt-Lichter. Ihre Positionen werden in Weltkoordinaten berechnet:</p>
+      <div class="formula">p<sub>j</sub> = (ρ cos(θ + θ<sub>j</sub>), 1, −ρ sin(θ + θ<sub>j</sub>)), ρ = √18, θ<sub>1</sub> = −45°, θ<sub>2</sub> = 135°</div>
+      <p>Bei θ = 0 liegen sie damit an den Positionen aus Übung BEL-02, <code>(3, 1, 3)</code> und <code>(−3, 1, −3)</code>, also einander gegenüber. Jeder Tastendruck erhöht θ um 15°, nach 24 Schritten ist ein Umlauf geschafft. Vor dem Zeichnen werden die Positionen in jedem Bild mit der View-Matrix der Kamera in Kamera-Koordinaten transformiert, in denen auch die Beleuchtung gerechnet wird. Deshalb bleiben die Lichter beim Drehen der Kamera an ihrem Ort in der Szene und sind nicht an der Kamera befestigt.</p>
+      <p><b>Lichtmarker.</b> An jeder Lichtposition wird eine kleine gelbe Kugel ohne Beleuchtungsrechnung gezeichnet, ähnlich dem Marker in Abb. 93 des Skripts. So ist die Bahn der Lichter sichtbar. Die Marker beeinflussen die Beleuchtung nicht.</p>
+      <p><b>Kamera.</b> Die Kamera kreist wie im Skript (Kapitel KAP) in der XZ-Ebene um das Zentrum, ihre Höhe ist einstellbar. Perspektivische Projektion mit 45° Öffnungswinkel. Startposition 7 Einheiten vor dem Zentrum in 4,5 Einheiten Höhe, so dass die ganze Lichtbahn im Bild liegt.</p>
+      <p><b>Technik.</b> WebGL 1 und GLSL ES 1.00 ohne Bibliotheken. Geometrie (Kugel, Torus, Ebene) parametrisch mit Index-Arrays erzeugt, Matrizen (Perspektive, lookAt, Normalenmatrix) selbst implementiert.</p>
+    </div>
+  </section>
+
+  <!-- A5 Material -->
+  <section aria-labelledby="a5">
+    <h2 id="a5"><span class="num">A5</span>Material &amp; Quellen</h2>
+    <div class="prose">
+      <ul>
+        <li><b>Skript:</b> F. Gers, Graphical Visualisation Technologies, Lerneinheiten GRU, KAP, TFM, SHA, SLP und BEL, insbesondere Kapitel 14.7 bis 14.11 mit den Übungen BEL-01 bis BEL-04.</li>
+        <li><b>Cel Shading (deutsch):</b> <a href="http://de.wikipedia.org/wiki/Cel_Shading" target="_blank" rel="noopener">de.wikipedia.org/wiki/Cel_Shading</a></li>
+        <li><b>Cel shading (englisch):</b> <a href="http://en.wikipedia.org/wiki/Cel_shading" target="_blank" rel="noopener">en.wikipedia.org/wiki/Cel_shading</a></li>
+        <li><b>GLSL Toon Shading:</b> <a href="http://en.wikibooks.org/wiki/GLSL_Programming/Unity/Toon_Shading" target="_blank" rel="noopener">en.wikibooks.org/wiki/GLSL_Programming/Unity/Toon_Shading</a>. Daraus stammt die Idee, Diffus- und Glanzanteil über Schwellwerte zu stufen und die Kontur über <code>dot(n, v)</code> zu bestimmen.</li>
+        <li><b>Toon-Shading-Demo:</b> <a href="https://webglsamples.org/toon-shading/toon-shading.html" target="_blank" rel="noopener">webglsamples.org/toon-shading/toon-shading.html</a></li>
+        <li><b>Fremdmaterial:</b> keines. Keine externen Bibliotheken, Schriften oder Bilder.</li>
+        <li><b>Quelltext:</b> die für diese Aufgabe geschriebenen Stellen sind mit <code>// START EA8_LICHTER_TOON</code> und <code>// END EA8_LICHTER_TOON</code> markiert.</li>
+      </ul>
+    </div>
+  </section>
+
+  <footer>
+    <p>Die Seite läuft vollständig im Browser. Es werden keine Daten an einen Server gesendet und nichts gespeichert.</p>
+  </footer>
+</main>
+
+<script type="x-shader/x-vertex" id="vertexshader">
+// START EA8_LICHTER_TOON
+attribute vec3 aPosition;
+attribute vec3 aNormal;
+
+uniform mat4 uPMatrix;
+uniform mat4 uMVMatrix;
+uniform mat3 uNMatrix;
+
+varying vec3 vNormal;
+varying vec4 vPosition;
+
+void main() {
+  // Position in Kamera-Koordinaten
+  vec4 tPosition = uMVMatrix * vec4(aPosition, 1.0);
+  gl_Position = uPMatrix * tPosition;
+
+  vec3 tNormal = normalize(uNMatrix * aNormal);
+
+  vPosition = tPosition;
+  vNormal = tNormal;
+}
+// END EA8_LICHTER_TOON
+</script>
+
+<script type="x-shader/x-fragment" id="fragmentshader">
+// START EA8_LICHTER_TOON
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+
+varying vec3 vNormal;
+varying vec4 vPosition;
+
+// Material
+struct PhongMaterial {
+  vec3 ka;
+  vec3 kd;
+  vec3 ks;
+  float ke;
+};
+uniform PhongMaterial material;
+
+// Ambientes Licht
+uniform vec3 ambientLight;
+
+// Punktlichter, Positionen in Kamera-Koordinaten
+const int MAX_LIGHT_SOURCES = 8;
+struct LightSource {
+  bool isOn;
+  vec3 position;
+  vec3 color;
+};
+uniform LightSource light[MAX_LIGHT_SOURCES];
+
+// Toon-Shader an/aus, Kontur für dieses Modell, Lichtmarker ohne Beleuchtung
+uniform bool uToon;
+uniform bool uOutline;
+uniform bool uUnlit;
+uniform vec3 uUnlitColor;
+
+// Diffuse Intensität auf vier Stufen runden
+float toonDiffuse(float sn) {
+  if (sn > 0.85) return 1.0;
+  if (sn > 0.5)  return 0.7;
+  if (sn > 0.2)  return 0.4;
+  return 0.0;
+}
+
+// Phong-Beleuchtung für ein Licht, ohne ambienten Anteil
+vec3 phong(vec3 p, vec3 n, vec3 v, LightSource l) {
+  vec3 L = l.color;
+
+  vec3 s = normalize(l.position - p);
+  vec3 r = reflect(-s, n);
+
+  float sn = max(dot(s, n), 0.0);
+  float rv = max(dot(r, v), 0.0);
+  float spec = sn > 0.0 ? pow(rv, material.ke) : 0.0;
+
+  if (uToon) {
+    sn = toonDiffuse(sn);
+    spec = step(0.5, spec);
+  }
+
+  vec3 diffuse = material.kd * L * sn;
+  vec3 specular = material.ks * L * spec;
+
+  return diffuse + specular;
+}
+
+// Phong-Beleuchtung für alle Lichter
+vec3 phong(vec3 p, vec3 n, vec3 v) {
+  vec3 result = material.ka * ambientLight;
+
+  for (int j = 0; j < MAX_LIGHT_SOURCES; j++) {
+    if (light[j].isOn) {
+      result += phong(p, n, v, light[j]);
+    }
+  }
+  return result;
+}
+
+void main() {
+  vec3 v = normalize(-vPosition.xyz);
+  vec3 n = normalize(vNormal);
+
+  if (uUnlit) {
+    // Lichtmarker: Eigenfarbe, zum Rand hin leicht dunkler
+    gl_FragColor = vec4(uUnlitColor * (0.7 + 0.3 * max(dot(n, v), 0.0)), 1.0);
+    return;
+  }
+
+  vec3 color = phong(vPosition.xyz, n, v);
+
+  // Dunkle Kontur, wo die Oberfläche fast parallel zur Blickrichtung steht
+  if (uToon && uOutline && dot(n, v) < 0.3) {
+    color = mix(vec3(0.04), material.kd, 0.12);
+  }
+
+  gl_FragColor = vec4(min(color, vec3(1.0)), 1.0);
+}
+// END EA8_LICHTER_TOON
+</script>
+
+<script>
+// START EA8_LICHTER_TOON
+(function () {
+  "use strict";
+
+  const statusEl = document.getElementById("globalStatus");
+  const canvas = document.getElementById("glCanvas");
+  const infoAngle = document.getElementById("infoAngle");
+  const infoL1 = document.getElementById("infoL1");
+  const infoL2 = document.getElementById("infoL2");
+  const infoToon = document.getElementById("infoToon");
+  const infoCam = document.getElementById("infoCam");
+  const btnLights = document.getElementById("btnLights");
+  const btnToon = document.getElementById("btnToon");
+  const btnToonLabel = document.getElementById("btnToonLabel");
+  const btnCamLeft = document.getElementById("btnCamLeft");
+  const btnCamRight = document.getElementById("btnCamRight");
+  const btnCamUp = document.getElementById("btnCamUp");
+  const btnCamDown = document.getElementById("btnCamDown");
+  const allButtons = [btnLights, btnToon, btnCamLeft, btnCamRight, btnCamUp, btnCamDown];
+
+  function setStatus(text, kind) {
+    statusEl.textContent = text;
+    statusEl.className = "global-status" + (kind ? " is-" + kind : "");
+  }
+
+  // ---------- Matrizen (spaltenweise gespeichert) ----------
+  const mat4 = {
+    create() { const m = new Float32Array(16); m[0] = m[5] = m[10] = m[15] = 1; return m; },
+    multiply(out, a, b) {
+      const r = new Float32Array(16);
+      for (let c = 0; c < 4; c++) {
+        for (let row = 0; row < 4; row++) {
+          let s = 0;
+          for (let k = 0; k < 4; k++) s += a[k * 4 + row] * b[c * 4 + k];
+          r[c * 4 + row] = s;
+        }
+      }
+      out.set(r);
+      return out;
+    },
+    perspective(out, fovy, aspect, near, far) {
+      const f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+      out.fill(0);
+      out[0] = f / aspect;
+      out[5] = f;
+      out[10] = (far + near) * nf;
+      out[11] = -1;
+      out[14] = 2 * far * near * nf;
+      return out;
+    },
+    lookAt(out, eye, center, up) {
+      const z = vec3.normalize(vec3.sub(eye, center));
+      const x = vec3.normalize(vec3.cross(up, z));
+      const y = vec3.cross(z, x);
+      out[0] = x[0]; out[1] = y[0]; out[2] = z[0]; out[3] = 0;
+      out[4] = x[1]; out[5] = y[1]; out[6] = z[1]; out[7] = 0;
+      out[8] = x[2]; out[9] = y[2]; out[10] = z[2]; out[11] = 0;
+      out[12] = -vec3.dot(x, eye); out[13] = -vec3.dot(y, eye); out[14] = -vec3.dot(z, eye); out[15] = 1;
+      return out;
+    },
+    // Model-Matrix aus Translation und Skalierung: M = T * S
+    fromTranslationScale(out, t, s) {
+      out.fill(0);
+      out[0] = s[0]; out[5] = s[1]; out[10] = s[2];
+      out[12] = t[0]; out[13] = t[1]; out[14] = t[2]; out[15] = 1;
+      return out;
+    },
+    transformPoint(m, p) {
+      return [
+        m[0] * p[0] + m[4] * p[1] + m[8] * p[2] + m[12],
+        m[1] * p[0] + m[5] * p[1] + m[9] * p[2] + m[13],
+        m[2] * p[0] + m[6] * p[1] + m[10] * p[2] + m[14]
+      ];
+    }
+  };
+
+  const vec3 = {
+    sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; },
+    dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; },
+    cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; },
+    normalize(a) { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+  };
+
+  // Normalenmatrix: Inverse der Transponierten des oberen 3x3-Teils.
+  // Mit den Spalten a0, a1, a2 gilt (A^-1)^T = [a1 x a2, a2 x a0, a0 x a1] / det(A).
+  function normalFromMat4(out, m) {
+    const a0 = [m[0], m[1], m[2]], a1 = [m[4], m[5], m[6]], a2 = [m[8], m[9], m[10]];
+    const c0 = vec3.cross(a1, a2), c1 = vec3.cross(a2, a0), c2 = vec3.cross(a0, a1);
+    const det = vec3.dot(a0, c0);
+    if (Math.abs(det) < 1e-12) return out;
+    const id = 1 / det;
+    out[0] = c0[0] * id; out[1] = c0[1] * id; out[2] = c0[2] * id;
+    out[3] = c1[0] * id; out[4] = c1[1] * id; out[5] = c1[2] * id;
+    out[6] = c2[0] * id; out[7] = c2[1] * id; out[8] = c2[2] * id;
+    return out;
+  }
+
+  // ---------- Geometrie ----------
+  // Parametrische Fläche als Gitter (n x m Felder) mit Vertex-, Normalen- und Index-Array
+  function createGrid(n, m, fn) {
+    const vertices = [], normals = [], indices = [];
+    for (let i = 0; i <= n; i++) {
+      for (let j = 0; j <= m; j++) {
+        const pn = fn(i / n, j / m);
+        vertices.push(pn[0], pn[1], pn[2]);
+        normals.push(pn[3], pn[4], pn[5]);
+      }
+    }
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < m; j++) {
+        const a = i * (m + 1) + j, b = a + m + 1;
+        indices.push(a, b, a + 1, a + 1, b, b + 1);
+      }
+    }
+    return { vertices: new Float32Array(vertices), normals: new Float32Array(normals), indices: new Uint16Array(indices) };
+  }
+
+  function sphereData(n, m) {
+    // u: Breite 0..PI, v: Länge 0..2PI, Radius 1, Normale = Position
+    return createGrid(n, m, function (s, t) {
+      const u = s * Math.PI, v = t * 2 * Math.PI;
+      const x = Math.sin(u) * Math.cos(v), y = Math.cos(u), z = Math.sin(u) * Math.sin(v);
+      return [x, y, z, x, y, z];
+    });
+  }
+
+  function torusData(n, m) {
+    // Parametrische Form aus dem Skript (GRU), Ring in der XY-Ebene
+    const R = 0.5, r = 0.25;
+    return createGrid(n, m, function (s, t) {
+      const u = s * 2 * Math.PI, v = t * 2 * Math.PI;
+      const x = (R + r * Math.cos(u)) * Math.cos(v);
+      const y = (R + r * Math.cos(u)) * Math.sin(v);
+      const z = r * Math.sin(u);
+      return [x, y, z, Math.cos(u) * Math.cos(v), Math.cos(u) * Math.sin(v), Math.sin(u)];
+    });
+  }
+
+  function planeData(n, size) {
+    // Ebene in der XZ-Ebene bei y = 0, Normale nach oben
+    return createGrid(n, n, function (s, t) {
+      return [(s - 0.5) * size, 0, (t - 0.5) * size, 0, 1, 0];
+    });
+  }
+
+  // ---------- Szene ----------
+  // Feste Auflösung 1040 x 650 (16:10), mit devicePixelRatio (höchstens 2) skaliert
+  const dpr = Math.min(Math.max(window.devicePixelRatio || 1, 1), 2);
+  canvas.width = Math.round(1040 * dpr);
+  canvas.height = Math.round(650 * dpr);
+
+  const camera = {
+    eye: [0, 4.5, 7.0],
+    center: [0, 0.35, 0],
+    up: [0, 1, 0],
+    fovy: 45 * Math.PI / 180,
+    aspect: canvas.width / canvas.height,
+    near: 0.1,
+    far: 60,
+    // Winkel zur Z-Achse und Abstand in der XZ-Ebene beim Kreisen um das Zentrum
+    zAngle: 0,
+    distance: 7.0,
+    vMatrix: mat4.create(),
+    pMatrix: mat4.create()
+  };
+
+  const illumination = {
+    ambientLight: [0.5, 0.5, 0.5],
+    light: [
+      { isOn: true, position: [3, 1, 3], color: [1, 1, 1] },
+      { isOn: true, position: [-3, 1, -3], color: [1, 1, 1] }
+    ]
+  };
+
+  // Kreisbahn der Lichter um die Y-Achse
+  const orbit = {
+    radius: Math.sqrt(18),
+    height: 1,
+    startAngles: [-Math.PI / 4, 3 * Math.PI / 4],
+    step: 15 * Math.PI / 180,
+    steps: 0
+  };
+
+  let toon = false;
+
+  function createPhongMaterial(material) {
+    material = material || {};
+    material.ka = material.ka || [0.3, 0.3, 0.3];
+    material.kd = material.kd || [0.6, 0.6, 0.6];
+    material.ks = material.ks || [0.8, 0.8, 0.8];
+    material.ke = material.ke || 10.0;
+    return material;
+  }
+
+  const models = [];
+  const markers = [];
+  let gl, prog;
+
+  function initGL() {
+    gl = canvas.getContext("webgl", { antialias: true });
+    if (!gl) throw new Error("WebGL wird von diesem Browser nicht unterstützt oder ist deaktiviert.");
+    gl.clearColor(0.118, 0.129, 0.149, 1);
+    gl.enable(gl.DEPTH_TEST);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+  }
+
+  function compileShader(type, id) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, document.getElementById(id).text);
+    gl.compileShader(shader);
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+      throw new Error("Shader " + id + " lässt sich nicht kompilieren:\n" + gl.getShaderInfoLog(shader));
+    }
+    return shader;
+  }
+
+  function initShaderProgram() {
+    prog = gl.createProgram();
+    gl.attachShader(prog, compileShader(gl.VERTEX_SHADER, "vertexshader"));
+    gl.attachShader(prog, compileShader(gl.FRAGMENT_SHADER, "fragmentshader"));
+    gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+      throw new Error("Shader-Programm lässt sich nicht linken:\n" + gl.getProgramInfoLog(prog));
+    }
+    gl.useProgram(prog);
+  }
+
+  function initUniforms() {
+    prog.positionAttrib = gl.getAttribLocation(prog, "aPosition");
+    prog.normalAttrib = gl.getAttribLocation(prog, "aNormal");
+    prog.pMatrixUniform = gl.getUniformLocation(prog, "uPMatrix");
+    prog.mvMatrixUniform = gl.getUniformLocation(prog, "uMVMatrix");
+    prog.nMatrixUniform = gl.getUniformLocation(prog, "uNMatrix");
+
+    // Licht
+    prog.ambientLightUniform = gl.getUniformLocation(prog, "ambientLight");
+    prog.lightUniform = [];
+    for (let j = 0; j < illumination.light.length; j++) {
+      const lightNb = "light[" + j + "]";
+      prog.lightUniform[j] = {
+        isOn: gl.getUniformLocation(prog, lightNb + ".isOn"),
+        position: gl.getUniformLocation(prog, lightNb + ".position"),
+        color: gl.getUniformLocation(prog, lightNb + ".color")
+      };
+    }
+
+    // Material
+    prog.materialKaUniform = gl.getUniformLocation(prog, "material.ka");
+    prog.materialKdUniform = gl.getUniformLocation(prog, "material.kd");
+    prog.materialKsUniform = gl.getUniformLocation(prog, "material.ks");
+    prog.materialKeUniform = gl.getUniformLocation(prog, "material.ke");
+
+    // Toon und Marker
+    prog.toonUniform = gl.getUniformLocation(prog, "uToon");
+    prog.outlineUniform = gl.getUniformLocation(prog, "uOutline");
+    prog.unlitUniform = gl.getUniformLocation(prog, "uUnlit");
+    prog.unlitColorUniform = gl.getUniformLocation(prog, "uUnlitColor");
+  }
+
+  function createBuffers(data) {
+    const geo = {};
+    geo.vbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, geo.vbo);
+    gl.bufferData(gl.ARRAY_BUFFER, data.vertices, gl.STATIC_DRAW);
+    geo.nbo = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, geo.nbo);
+    gl.bufferData(gl.ARRAY_BUFFER, data.normals, gl.STATIC_DRAW);
+    geo.ibo = gl.createBuffer();
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geo.ibo);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, data.indices, gl.STATIC_DRAW);
+    geo.indexCount = data.indices.length;
+    return geo;
+  }
+
+  function createModel(geometry, translate, scale, material, outline) {
+    const model = {
+      geometry: geometry,
+      translate: translate,
+      scale: scale,
+      material: material,
+      outline: outline,
+      mMatrix: mat4.create(),
+      mvMatrix: mat4.create(),
+      nMatrix: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1])
+    };
+    mat4.fromTranslationScale(model.mMatrix, translate, scale);
+    return model;
+  }
+
+  function initModels() {
+    const sphere = createBuffers(sphereData(48, 64));
+    const torus = createBuffers(torusData(48, 96));
+    const plane = createBuffers(planeData(24, 12));
+
+    // Materialien wie in Übung BEL-03, ka zusätzlich in der Materialfarbe getönt
+    const mRed = createPhongMaterial({ ka: [0.4, 0.04, 0.04], kd: [1, 0, 0] });
+    const mGreen = createPhongMaterial({ ka: [0.04, 0.4, 0.04], kd: [0, 1, 0] });
+    const mBlue = createPhongMaterial({ ka: [0.04, 0.04, 0.4], kd: [0, 0, 1] });
+    const mWhite = createPhongMaterial({ ka: [1, 1, 1], kd: [0.5, 0.5, 0.5], ks: [0, 0, 0] });
+
+    models.push(createModel(torus, [0, 0.75, 0], [1, 1, 1], mRed, true));
+    models.push(createModel(sphere, [-1.25, 0.5, 0], [0.5, 0.5, 0.5], mGreen, true));
+    models.push(createModel(sphere, [1.25, 0.5, 0], [0.5, 0.5, 0.5], mBlue, true));
+    models.push(createModel(plane, [0, 0, 0], [1, 1, 1], mWhite, false));
+
+    // Lichtmarker: kleine Kugeln an den Lichtpositionen
+    for (let j = 0; j < illumination.light.length; j++) {
+      markers.push(createModel(sphere, illumination.light[j].position, [0.09, 0.09, 0.09], null, false));
+    }
+  }
+
+  // ---------- Lichtbahn und Kamera ----------
+  function updateLightPositions() {
+    const theta = orbit.steps * orbit.step;
+    for (let j = 0; j < illumination.light.length; j++) {
+      const a = orbit.startAngles[j] + theta;
+      const p = illumination.light[j].position;
+      p[0] = orbit.radius * Math.cos(a);
+      p[1] = orbit.height;
+      p[2] = -orbit.radius * Math.sin(a);
+      // Rundungsrauschen bei Vielfachen von 90° entfernen
+      if (Math.abs(p[0]) < 1e-9) p[0] = 0;
+      if (Math.abs(p[2]) < 1e-9) p[2] = 0;
+      mat4.fromTranslationScale(markers[j].mMatrix, p, markers[j].scale);
+    }
+  }
+
+  function calculateCameraOrbit() {
+    camera.eye[0] = camera.center[0] + camera.distance * Math.sin(camera.zAngle);
+    camera.eye[2] = camera.center[2] + camera.distance * Math.cos(camera.zAngle);
+  }
+
+  // ---------- Zeichnen ----------
+  function draw(model) {
+    const geo = model.geometry;
+    mat4.multiply(model.mvMatrix, camera.vMatrix, model.mMatrix);
+    normalFromMat4(model.nMatrix, model.mvMatrix);
+    gl.uniformMatrix4fv(prog.mvMatrixUniform, false, model.mvMatrix);
+    gl.uniformMatrix3fv(prog.nMatrixUniform, false, model.nMatrix);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, geo.vbo);
+    gl.vertexAttribPointer(prog.positionAttrib, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ARRAY_BUFFER, geo.nbo);
+    gl.vertexAttribPointer(prog.normalAttrib, 3, gl.FLOAT, false, 0, 0);
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, geo.ibo);
+    gl.drawElements(gl.TRIANGLES, geo.indexCount, gl.UNSIGNED_SHORT, 0);
+  }
+
+  function render() {
+    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+    calculateCameraOrbit();
+    mat4.lookAt(camera.vMatrix, camera.eye, camera.center, camera.up);
+    mat4.perspective(camera.pMatrix, camera.fovy, camera.aspect, camera.near, camera.far);
+    gl.uniformMatrix4fv(prog.pMatrixUniform, false, camera.pMatrix);
+
+    gl.enableVertexAttribArray(prog.positionAttrib);
+    gl.enableVertexAttribArray(prog.normalAttrib);
+
+    // Lichter: Weltposition mit der View-Matrix in Kamera-Koordinaten transformieren
+    gl.uniform3fv(prog.ambientLightUniform, illumination.ambientLight);
+    for (let j = 0; j < illumination.light.length; j++) {
+      const l = illumination.light[j];
+      gl.uniform1i(prog.lightUniform[j].isOn, l.isOn ? 1 : 0);
+      gl.uniform3fv(prog.lightUniform[j].position, mat4.transformPoint(camera.vMatrix, l.position));
+      gl.uniform3fv(prog.lightUniform[j].color, l.color);
+    }
+
+    gl.uniform1i(prog.toonUniform, toon ? 1 : 0);
+    gl.uniform1i(prog.unlitUniform, 0);
+    for (let i = 0; i < models.length; i++) {
+      const m = models[i].material;
+      gl.uniform3fv(prog.materialKaUniform, m.ka);
+      gl.uniform3fv(prog.materialKdUniform, m.kd);
+      gl.uniform3fv(prog.materialKsUniform, m.ks);
+      gl.uniform1f(prog.materialKeUniform, m.ke);
+      gl.uniform1i(prog.outlineUniform, models[i].outline ? 1 : 0);
+      draw(models[i]);
+    }
+
+    gl.uniform1i(prog.unlitUniform, 1);
+    gl.uniform1i(prog.outlineUniform, 0);
+    gl.uniform3fv(prog.unlitColorUniform, [1.0, 0.86, 0.3]);
+    for (let j = 0; j < markers.length; j++) {
+      if (illumination.light[j].isOn) draw(markers[j]);
+    }
+  }
+
+  let renderPending = false;
+  function requestRender() {
+    if (renderPending) return;
+    renderPending = true;
+    requestAnimationFrame(function () {
+      renderPending = false;
+      if (!gl.isContextLost()) render();
+    });
+  }
+
+  // ---------- Anzeige ----------
+  function fmt(x) { return x.toFixed(2).replace("-0.00", "0.00"); }
+  function fmtPos(p) { return "(" + fmt(p[0]) + ", " + fmt(p[1]) + ", " + fmt(p[2]) + ")"; }
+
+  function updateInfo() {
+    const deg = (orbit.steps * 15) % 360;
+    infoAngle.textContent = deg + "°";
+    infoL1.textContent = fmtPos(illumination.light[0].position);
+    infoL2.textContent = fmtPos(illumination.light[1].position);
+    infoToon.textContent = toon ? "an" : "aus";
+    btnToonLabel.textContent = toon ? "Toon-Shader ausschalten" : "Toon-Shader einschalten";
+    btnToon.setAttribute("aria-pressed", toon ? "true" : "false");
+    const camDeg = Math.round(((camera.zAngle * 180 / Math.PI) % 360 + 360) % 360);
+    infoCam.textContent = camDeg + "°, Höhe " + camera.eye[1].toFixed(2);
+  }
+
+  // ---------- Interaktion ----------
+  function stepLights() {
+    orbit.steps = (orbit.steps + 1) % 24;
+    updateLightPositions();
+    updateInfo();
+    requestRender();
+  }
+
+  function toggleToon() {
+    toon = !toon;
+    updateInfo();
+    setStatus(toon ? "Toon-Shader an. Mit T oder dem Button wieder ausschalten." : "Toon-Shader aus, normales Phong-Shading.", "ready");
+    requestRender();
+  }
+
+  function rotateCamera(sign) {
+    camera.zAngle += sign * 5 * Math.PI / 180;
+    updateInfo();
+    requestRender();
+  }
+
+  function moveCameraHeight(sign) {
+    camera.eye[1] = Math.min(9, Math.max(0.4, camera.eye[1] + sign * 0.25));
+    updateInfo();
+    requestRender();
+  }
+
+  function flash(btn) {
+    btn.classList.add("is-pressed");
+    setTimeout(function () { btn.classList.remove("is-pressed"); }, 120);
+  }
+
+  function initEventHandler() {
+    btnLights.addEventListener("click", stepLights);
+    btnToon.addEventListener("click", toggleToon);
+    btnCamLeft.addEventListener("click", function () { rotateCamera(-1); });
+    btnCamRight.addEventListener("click", function () { rotateCamera(1); });
+    btnCamUp.addEventListener("click", function () { moveCameraHeight(1); });
+    btnCamDown.addEventListener("click", function () { moveCameraHeight(-1); });
+
+    window.addEventListener("keydown", function (evt) {
+      if (evt.ctrlKey || evt.metaKey || evt.altKey) return;
+      // Kamera: Gedrückthalten darf wiederholen
+      switch (evt.key) {
+        case "ArrowLeft": evt.preventDefault(); flash(btnCamLeft); rotateCamera(-1); return;
+        case "ArrowRight": evt.preventDefault(); flash(btnCamRight); rotateCamera(1); return;
+        case "ArrowUp": evt.preventDefault(); flash(btnCamUp); moveCameraHeight(1); return;
+        case "ArrowDown": evt.preventDefault(); flash(btnCamDown); moveCameraHeight(-1); return;
+      }
+      // Lichter und Toon: ein Schritt pro Tastendruck
+      if (evt.repeat) return;
+      switch ((evt.key || "").toLowerCase()) {
+        case "l": flash(btnLights); stepLights(); break;
+        case "t": flash(btnToon); toggleToon(); break;
+      }
+    });
+
+    canvas.addEventListener("webglcontextlost", function (evt) {
+      evt.preventDefault();
+      setStatus("Fehler: Der WebGL-Kontext ist verloren gegangen. Bitte die Seite neu laden.", "error");
+    });
+  }
+
+  // ---------- Start ----------
+  try {
+    initGL();
+    initShaderProgram();
+    initUniforms();
+    initModels();
+    updateLightPositions();
+    initEventHandler();
+    updateInfo();
+    allButtons.forEach(function (b) { b.disabled = false; });
+    requestRender();
+    setStatus("Bereit. Mit L die Lichter bewegen, mit T den Toon-Shader schalten, mit den Pfeiltasten die Kamera drehen.", "ready");
+  } catch (err) {
+    console.error(err);
+    setStatus("Fehler: " + err.message, "error");
+  }
+})();
+// END EA8_LICHTER_TOON
+
+// Hilfe-Popover
+document.querySelectorAll(".help").forEach(help => {
+  const btn = help.querySelector(".help-btn");
+  btn.addEventListener("click", e => {
+    e.stopPropagation();
+    document.querySelectorAll(".help.is-open").forEach(h => { if (h !== help) { h.classList.remove("is-open"); h.querySelector(".help-btn").setAttribute("aria-expanded", "false"); } });
+    const open = help.classList.toggle("is-open");
+    btn.setAttribute("aria-expanded", open ? "true" : "false");
+  });
+});
+document.addEventListener("click", e => { if (!e.target.closest(".help")) document.querySelectorAll(".help.is-open").forEach(h => { h.classList.remove("is-open"); h.querySelector(".help-btn").setAttribute("aria-expanded", "false"); }); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") document.querySelectorAll(".help.is-open").forEach(h => { h.classList.remove("is-open"); h.querySelector(".help-btn").setAttribute("aria-expanded", "false"); }); });
+</script>
+</body>
+</html>
